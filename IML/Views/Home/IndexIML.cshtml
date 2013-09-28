@@ -1,0 +1,118 @@
+﻿@using IML
+@using IML.Controllers
+@using Incoding.MetaLanguageContrib
+@using Incoding.MvcContrib
+@model IML.Controllers.FetchCustomerQuery
+@{
+    Layout = "~/Views/Shared/Layout.cshtml";
+}
+
+@{
+    string customerTmplId = Guid.NewGuid().ToString();
+    string containerId = Guid.NewGuid().ToString();
+    using (var template = Html.Incoding().ScriptTemplate<CustomerVm>(customerTmplId))
+    {
+        <ul>
+            @using (var each = template.ForEach())
+            {
+                <li style="@each.IsInline(r => r.IsPublic, new MvcHtmlString("color:red;"))">
+                    @each.For(r => r.Name) from @each.For(r => r.Country) on @each.For(r => r.City)
+                    @using (each.Is(r => r.IsPublic))
+                    {
+                        @(Html.When(JqueryBind.Click)
+                              .Do()
+                              .AjaxGet(HttpUtility.UrlDecode(Url.Action("Details", "Customer", new FetchCustomerQuery { Name = each.For(r => r.Name) })))
+                              .OnSuccess(dsl => dsl.With(r => r.Id("dialogId"))
+                                                   .Behaviors(inDsl =>
+                                                                  {
+                                                                      inDsl.Core().Insert.Html();
+                                                                      inDsl.JqueryUI().Dialog.Open(options =>
+                                                                                                       {
+                                                                                                           options.Title = "Detail Customer";                                                                                                           
+                                                                                                       });
+                                                                  }))
+                              .AsHtmlAttributes()
+                              .ToLink("Show detail"))
+                    }
+                </li>
+            }
+        </ul>
+    }
+}
+
+
+@{
+    string dropDownTmplId = Guid.NewGuid().ToString();
+    using (var template = Html.Incoding().ScriptTemplate<KeyValueVm>(dropDownTmplId))
+    {
+        using (var each = template.ForEach())
+        {
+            <option value="@each.For(r => r.Value)">@each.For(r => r.Text)</option>
+        }
+    }
+}
+
+<div>
+    <label>Name:</label>
+    @Html.TextBoxFor(r => r.Name, Html.When(JqueryBind.InitIncoding)
+                                      .Do()
+                                      .Direct()
+                                      .OnSuccess(dsl => dsl.Self().Core().JQuery.Attributes.Val(Selector.Incoding.QueryString("Now")))
+                                      .AsHtmlAttributes())
+    <br/>
+    <label>Country:</label>
+    @Html.DropDownListFor(r => r.Country,
+                          new SelectList(new string[0]),
+                          Html.When(JqueryBind.InitIncoding)
+                              .Do()
+                              .Ajax(options =>
+                                        {
+                                            options.Cache = true;
+                                            options.Url = Url.Action("FetchCountry", "Reference");
+                                        })
+                              .OnSuccess(dsl =>
+                                             {
+                                                 dsl.Self().Core().Insert.WithTemplate(Selector.Jquery.Id(dropDownTmplId)).Html();
+                                                 dsl.Self().Core().JQuery.Manipulation.Prepend(@<option value="" selected="selected">All</option>);
+                                                 dsl.Self().Core().Trigger.Invoke(JqueryBind.Change);
+                                             })
+                              .When(JqueryBind.Change)
+                              .Do()
+                              .Direct()
+                              .OnSuccess(dsl => dsl.With(r => r.Name<FetchCustomerQuery>(s => s.City)).Core().Trigger.Incoding())
+                              .AsHtmlAttributes())
+    
+    <br/>
+    <label>City:</label>
+    @Html.DropDownListFor(r => r.City, new SelectList(new string[0]), Html.When(JqueryBind.InitIncoding)
+                                                                          .Do()
+                                                                          .AjaxGet(Url.Action("FetchCity", "Reference", new { Country = Selector.Jquery.Name<FetchCustomerQuery>(r => r.Country) }))
+                                                                          .OnSuccess(dsl =>
+                                                                                         {
+                                                                                             dsl.Self().Core().Insert.WithTemplate(Selector.Jquery.Id(dropDownTmplId)).Html();
+                                                                                             dsl.Self().Core().JQuery.Manipulation.Prepend(@<text><option value="" selected="selected">All</option></text>);
+                                                                                             dsl.With(r => r.Id(containerId)).Core().Trigger.Incoding();
+                                                                                         })
+                                                                          .AsHtmlAttributes())
+    @(Html.When(JqueryBind.Click)
+          .Do()
+          .Direct()
+          .OnSuccess(dsl => dsl.With(r => r.Id(containerId)).Core().Trigger.Incoding())
+          .AsHtmlAttributes()
+          .ToButton("Search"))
+
+</div>
+
+
+@Html.Load(setting =>
+               {
+                   setting.Id = containerId;
+                   setting.Url = Url.Action("Fetch", "Customer", new FetchCustomerQuery
+                                                                     {
+                                                                             Name = Selector.Jquery.Name<FetchCustomerQuery>(r => r.Name),
+                                                                             Country = Selector.Jquery.Name<FetchCustomerQuery>(r => r.Country),
+                                                                             City = Selector.Jquery.Name<FetchCustomerQuery>(r => r.City)
+                                                                     });
+                   setting.IsAppend = false;
+                   setting.Template = Selector.Jquery.Id(customerTmplId);
+               })

@@ -1,0 +1,34 @@
+﻿@{
+    Layout = "~/Views/Shared/Layout.cshtml";
+}
+@model IML.Controllers.FetchCustomerQuery
+<script>
+    $(document).ready(function() {
+      
+        $('#btnSearch').click(function() {
+            $.get('@Url.Action("Fetch", "Customer")',{name :$('#name').val()}, function(result) {
+                if (!result.success) {
+                    return true;
+                }
+
+                $('#containerId').empty();
+                $(result.data).each(function() {
+                    $('#containerId').append($('<li>').html('{0} from {1}'.f(this.Name,this.Country)));
+                });
+
+            });
+        }).click();
+
+    });
+</script>
+
+<div>
+    <label>Name:</label>
+    <input type="text" id="name"/>    
+    <br/>
+    <input type="button" id="btnSearch" value="Search"/>
+</div>
+
+<ul id="containerId">
+    
+</ul>
